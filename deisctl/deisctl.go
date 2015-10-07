@@ -32,6 +32,7 @@ Commands, use "deisctl help <command>" to learn more:
   install           install components, or the entire platform
   uninstall         uninstall components
   list              list installed components
+  list-machines     Enumerate the current hosts in the cluster
   start             start components
   stop              stop components
   restart           stop, then start components
@@ -95,6 +96,8 @@ Options:
 	switch command {
 	case "list":
 		err = c.List(argv)
+  case "list-machines":
+    err = c.ListMachines(argv)
 	case "scale":
 		err = c.Scale(argv)
 	case "start":
