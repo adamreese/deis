@@ -55,7 +55,7 @@ func (backend *backendStub) RollingRestart(target string, wg *sync.WaitGroup, ou
 }
 
 func (backend *backendStub) ListMachines() error {
-  return nil
+	return nil
 }
 
 func (backend *backendStub) ListUnits() error {

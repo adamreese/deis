@@ -22,7 +22,7 @@ type DeisCtlClient interface {
 	Install(argv []string) error
 	Journal(argv []string) error
 	List(argv []string) error
-  ListMachines(argv []string) error
+	ListMachines(argv []string) error
 	RefreshUnits(argv []string) error
 	Restart(argv []string) error
 	Scale(argv []string) error
@@ -249,10 +249,10 @@ Usage:
   deisctl list-machines
 `
 	// parse command-line arguments
-  if _, err := docopt.Parse(usage, argv, true, "", false); err != nil {
-    return err
-  }
-  return cmd.ListMachines(c.Backend)
+	if _, err := docopt.Parse(usage, argv, true, "", false); err != nil {
+		return err
+	}
+	return cmd.ListMachines(c.Backend)
 }
 
 // RefreshUnits overwrites local unit files with those requested.

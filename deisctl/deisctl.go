@@ -96,8 +96,8 @@ Options:
 	switch command {
 	case "list":
 		err = c.List(argv)
-  case "list-machines":
-    err = c.ListMachines(argv)
+	case "list-machines":
+		err = c.ListMachines(argv)
 	case "scale":
 		err = c.Scale(argv)
 	case "start":
