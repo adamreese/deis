@@ -12,13 +12,13 @@ import (
 
 // InstallPlatform loads all components' definitions from local unit files.
 // After InstallPlatform, all components will be available for StartPlatform.
-func InstallPlatform(b backend.Backend, cb config.Backend, checkKeys func(config.Backend) error, stateless bool) error {
+func InstallPlatform(b backend.Backend, cb config.Backend, checkKeys func(config.Backend) error) error {
 
 	if err := checkKeys(cb); err != nil {
 		return err
 	}
 
-	if stateless {
+	if Stateless {
 		fmt.Println("Warning: With a stateless control plane, `deis logs` will be unavailable.")
 		fmt.Println("Additionally, components will need to be configured to use external persistent stores.")
 		fmt.Println("See the official Deis documentation for details on running a stateless control plane.")
@@ -28,13 +28,13 @@ func InstallPlatform(b backend.Backend, cb config.Backend, checkKeys func(config
 
 	io.WriteString(Stdout, prettyprint.DeisIfy("Installing Deis..."))
 
-	installDefaultServices(b, stateless, &wg, Stdout, Stderr)
+	installDefaultServices(b, &wg, Stdout, Stderr)
 
 	wg.Wait()
 
 	fmt.Fprintln(Stdout, "Done.")
 	fmt.Fprintln(Stdout, "")
-	if stateless {
+	if Stateless {
 		fmt.Fprintln(Stdout, "Please run `deisctl start stateless-platform` to boot up Deis.")
 	} else {
 		fmt.Fprintln(Stdout, "Please run `deisctl start platform` to boot up Deis.")
@@ -43,13 +43,13 @@ func InstallPlatform(b backend.Backend, cb config.Backend, checkKeys func(config
 }
 
 // StartPlatform activates all components.
-func StartPlatform(b backend.Backend, stateless bool) error {
+func StartPlatform(b backend.Backend) error {
 
 	var wg sync.WaitGroup
 
 	io.WriteString(Stdout, prettyprint.DeisIfy("Starting Deis..."))
 
-	startDefaultServices(b, stateless, &wg, Stdout, Stderr)
+	startDefaultServices(b, &wg, Stdout, Stderr)
 
 	wg.Wait()
 
@@ -59,18 +59,18 @@ func StartPlatform(b backend.Backend, stateless bool) error {
 }
 
 // StopPlatform deactivates all components.
-func StopPlatform(b backend.Backend, stateless bool) error {
+func StopPlatform(b backend.Backend) error {
 
 	var wg sync.WaitGroup
 
 	io.WriteString(Stdout, prettyprint.DeisIfy("Stopping Deis..."))
 
-	stopDefaultServices(b, stateless, &wg, Stdout, Stderr)
+	stopDefaultServices(b, &wg, Stdout, Stderr)
 
 	wg.Wait()
 
 	fmt.Fprintln(Stdout, "Done.\n ")
-	if stateless {
+	if Stateless {
 		fmt.Fprintln(Stdout, "Please run `deisctl start stateless-platform` to restart Deis.")
 	} else {
 		fmt.Fprintln(Stdout, "Please run `deisctl start platform` to restart Deis.")
@@ -80,13 +80,13 @@ func StopPlatform(b backend.Backend, stateless bool) error {
 
 // UninstallPlatform unloads all components' definitions.
 // After UninstallPlatform, all components will be unavailable.
-func UninstallPlatform(b backend.Backend, stateless bool) error {
+func UninstallPlatform(b backend.Backend) error {
 
 	var wg sync.WaitGroup
 
 	io.WriteString(Stdout, prettyprint.DeisIfy("Uninstalling Deis..."))
 
-	uninstallAllServices(b, stateless, &wg, Stdout, Stderr)
+	uninstallAllServices(b, &wg, Stdout, Stderr)
 
 	wg.Wait()
 

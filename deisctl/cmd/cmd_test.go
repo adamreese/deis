@@ -263,7 +263,7 @@ func TestStartPlatform(t *testing.T) {
 }
 
 func TestStartStatelessPlatform(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 
 	b := backendStub{}
 	expected := []string{"logger", "logspout", "registry@*", "controller",
@@ -271,6 +271,7 @@ func TestStartStatelessPlatform(t *testing.T) {
 		"builder", "publisher", "router@*"}
 
 	Start([]string{"stateless-platform"}, &b)
+	Stateless = false
 
 	if !reflect.DeepEqual(b.startedUnits, expected) {
 		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.startedUnits))
@@ -310,7 +311,7 @@ func TestUpgradePrep(t *testing.T) {
 	expected := []string{"database", "registry@*", "controller", "builder", "logger", "logspout", "store-volume",
 		"store-gateway@*", "store-metadata", "store-daemon", "store-monitor"}
 
-	UpgradePrep(false, &b)
+	UpgradePrep(&b)
 
 	if !reflect.DeepEqual(b.stoppedUnits, expected) {
 		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.stoppedUnits))
@@ -318,12 +319,14 @@ func TestUpgradePrep(t *testing.T) {
 }
 
 func TestStatelessUpgradePrep(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 
 	b := backendStub{}
 	expected := []string{"database", "registry@*", "controller", "builder", "logger", "logspout"}
 
-	UpgradePrep(true, &b)
+	Stateless = true
+	UpgradePrep(&b)
+	Stateless = false
 
 	if !reflect.DeepEqual(b.stoppedUnits, expected) {
 		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.stoppedUnits))
@@ -342,7 +345,7 @@ func TestUpgradeTakeover(t *testing.T) {
 		"controller", "builder", "publisher", "database", "registry@*",
 		"controller", "builder", "publisher"}
 
-	if err := doUpgradeTakeOver(false, &b, testMock); err != nil {
+	if err := doUpgradeTakeOver(&b, testMock); err != nil {
 		t.Error(fmt.Errorf("Takeover failed: %v", err))
 	}
 
@@ -355,7 +358,7 @@ func TestUpgradeTakeover(t *testing.T) {
 }
 
 func TestStatelessUpgradeTakeover(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 	testMock := mock.ConfigBackend{Expected: []*model.ConfigNode{{Key: "/deis/services/app1", Value: "foo", TTL: 10},
 		{Key: "/deis/services/app2", Value: "8000", TTL: 10}}}
 
@@ -365,9 +368,11 @@ func TestStatelessUpgradeTakeover(t *testing.T) {
 		"controller", "builder", "publisher", "router@*", "registry@*",
 		"controller", "builder", "publisher"}
 
-	if err := doUpgradeTakeOver(true, &b, testMock); err != nil {
+	Stateless = true
+	if err := doUpgradeTakeOver(&b, testMock); err != nil {
 		t.Error(fmt.Errorf("Takeover failed: %v", err))
 	}
+	Stateless = false
 
 	if !reflect.DeepEqual(b.restartedUnits, expectedRestarted) {
 		t.Error(fmt.Errorf("Expected %v, Got %v", expectedRestarted, b.restartedUnits))
@@ -404,12 +409,13 @@ func TestStopPlatform(t *testing.T) {
 }
 
 func TestStopStatelessPlatform(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 
 	b := backendStub{}
 	expected := []string{"router@*", "publisher", "controller", "builder",
 		"registry@*", "logspout"}
 	Stop([]string{"stateless-platform"}, &b)
+	Stateless = false
 
 	if !reflect.DeepEqual(b.stoppedUnits, expected) {
 		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.stoppedUnits))
@@ -574,7 +580,7 @@ func TestInstallPlatformWithCustomRouterMeshSize(t *testing.T) {
 }
 
 func TestInstallStatelessPlatform(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 
 	b := backendStub{}
 	cb := mock.ConfigBackend{}
@@ -583,6 +589,7 @@ func TestInstallStatelessPlatform(t *testing.T) {
 		"controller", "builder", "publisher", "router@1", "router@2", "router@3"}
 
 	Install([]string{"stateless-platform"}, &b, &cb, fakeCheckKeys)
+	Stateless = false
 
 	if !reflect.DeepEqual(b.installedUnits, expected) {
 		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.installedUnits))
@@ -633,13 +640,14 @@ func TestUninstallPlatform(t *testing.T) {
 }
 
 func TestUninstallStatelessPlatform(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 
 	b := backendStub{}
 	expected := []string{"router@*", "publisher", "controller", "builder",
 		"registry@*", "logspout"}
 
 	Uninstall([]string{"stateless-platform"}, &b)
+	Stateless = false
 
 	if !reflect.DeepEqual(b.uninstalledUnits, expected) {
 		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.uninstalledUnits))

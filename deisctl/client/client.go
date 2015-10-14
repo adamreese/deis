@@ -85,9 +85,9 @@ Options:
 		return err
 	}
 
-	stateless, _ := args["--stateless"].(bool)
+	cmd.Stateless, _ = args["--stateless"].(bool)
 
-	return cmd.UpgradePrep(stateless, c.Backend)
+	return cmd.UpgradePrep(c.Backend)
 }
 
 // UpgradeTakeover gracefully restarts a cluster prepared with upgrade-prep
@@ -105,9 +105,9 @@ Options:
 		return err
 	}
 
-	stateless, _ := args["--stateless"].(bool)
+	cmd.Stateless, _ = args["--stateless"].(bool)
 
-	return cmd.UpgradeTakeover(stateless, c.Backend, c.configBackend)
+	return cmd.UpgradeTakeover(c.Backend, c.configBackend)
 }
 
 // RollingRestart attempts a rolling restart of an instance unit
@@ -193,6 +193,7 @@ Usage:
 
 Options:
   --router-mesh-size=<num>  Number of routers to be loaded when installing the platform [default: %d].
+  --stateless=false         Install the platform in stateless mode [default: false].
 `, cmd.DefaultRouterMeshSize)
 	// parse command-line arguments
 	args, err := docopt.Parse(usage, argv, true, "", false)
@@ -207,6 +208,8 @@ Options:
 		return err
 	}
 	cmd.RouterMeshSize = uint8(parsedValue)
+
+	cmd.Stateless, _ = args["--stateless"].(bool)
 
 	return cmd.Install(args["<target>"].([]string), c.Backend, c.configBackend, cmd.CheckRequiredKeys)
 }

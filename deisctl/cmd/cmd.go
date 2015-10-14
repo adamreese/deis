@@ -54,6 +54,8 @@ var Stderr io.Writer = os.Stderr
 // Number of routers to be installed. By default, it's DefaultRouterMeshSize.
 var RouterMeshSize = DefaultRouterMeshSize
 
+var Stateless = false
+
 // Scale grows or shrinks the number of running components.
 // Currently "router", "registry" and "store-gateway" are the only types that can be scaled.
 func Scale(targets []string, b backend.Backend) error {
@@ -81,9 +83,10 @@ func Start(targets []string, b backend.Backend) error {
 	if len(targets) == 1 {
 		switch targets[0] {
 		case PlatformCommand:
-			return StartPlatform(b, false)
+			return StartPlatform(b)
 		case StatelessPlatformCommand:
-			return StartPlatform(b, true)
+			Stateless = true
+			return StartPlatform(b)
 		case mesos:
 			return StartMesos(b)
 		case swarm:
@@ -125,11 +128,11 @@ deisctl config platform set sshPrivateKey=<path-to-key>
 	return nil
 }
 
-func startDefaultServices(b backend.Backend, stateless bool, wg *sync.WaitGroup, out, err io.Writer) {
+func startDefaultServices(b backend.Backend, wg *sync.WaitGroup, out, err io.Writer) {
 
 	// Wait for groups to come up.
 	// If we're running in stateless mode, we start only a subset of services.
-	if !stateless {
+	if !Stateless {
 		fmt.Fprintln(out, "Storage subsystem...")
 		b.Start([]string{"store-monitor"}, wg, out, err)
 		wg.Wait()
@@ -159,7 +162,7 @@ func startDefaultServices(b backend.Backend, stateless bool, wg *sync.WaitGroup,
 		"database", "registry@*", "controller", "builder",
 		"publisher", "router@*",
 	}
-	if stateless {
+	if Stateless {
 		batch = []string{"registry@*", "controller", "builder", "publisher", "router@*"}
 	}
 	b.Start(batch, &bgwg, &trash, &trash)
@@ -167,7 +170,7 @@ func startDefaultServices(b backend.Backend, stateless bool, wg *sync.WaitGroup,
 
 	fmt.Fprintln(Stdout, "Control plane...")
 	batch = []string{"database", "registry@*", "controller"}
-	if stateless {
+	if Stateless {
 		batch = []string{"registry@*", "controller"}
 	}
 	b.Start(batch, wg, out, err)
@@ -192,9 +195,10 @@ func Stop(targets []string, b backend.Backend) error {
 	if len(targets) == 1 {
 		switch targets[0] {
 		case PlatformCommand:
-			return StopPlatform(b, false)
+			return StopPlatform(b)
 		case StatelessPlatformCommand:
-			return StopPlatform(b, true)
+			Stateless = true
+			return StopPlatform(b)
 		case mesos:
 			return StopMesos(b)
 		case swarm:
@@ -212,7 +216,7 @@ func Stop(targets []string, b backend.Backend) error {
 	return nil
 }
 
-func stopDefaultServices(b backend.Backend, stateless bool, wg *sync.WaitGroup, out, err io.Writer) {
+func stopDefaultServices(b backend.Backend, wg *sync.WaitGroup, out, err io.Writer) {
 
 	fmt.Fprintln(out, "Router mesh...")
 	b.Stop([]string{"router@*"}, wg, out, err)
@@ -223,7 +227,7 @@ func stopDefaultServices(b backend.Backend, stateless bool, wg *sync.WaitGroup, 
 	wg.Wait()
 
 	fmt.Fprintln(out, "Control plane...")
-	if stateless {
+	if Stateless {
 		b.Stop([]string{"controller", "builder", "registry@*"}, wg, out, err)
 	} else {
 		b.Stop([]string{"controller", "builder", "database", "registry@*"}, wg, out, err)
@@ -231,14 +235,14 @@ func stopDefaultServices(b backend.Backend, stateless bool, wg *sync.WaitGroup, 
 	wg.Wait()
 
 	fmt.Fprintln(out, "Logging subsystem...")
-	if stateless {
+	if Stateless {
 		b.Stop([]string{"logspout"}, wg, out, err)
 	} else {
 		b.Stop([]string{"logger", "logspout"}, wg, out, err)
 	}
 	wg.Wait()
 
-	if !stateless {
+	if !Stateless {
 		fmt.Fprintln(out, "Storage subsystem...")
 		b.Stop([]string{"store-volume", "store-gateway@*"}, wg, out, err)
 		wg.Wait()
@@ -293,9 +297,10 @@ func Install(targets []string, b backend.Backend, cb config.Backend, checkKeys f
 	if len(targets) == 1 {
 		switch targets[0] {
 		case PlatformCommand:
-			return InstallPlatform(b, cb, checkKeys, false)
+			return InstallPlatform(b, cb, checkKeys)
 		case StatelessPlatformCommand:
-			return InstallPlatform(b, cb, checkKeys, true)
+			Stateless = true
+			return InstallPlatform(b, cb, checkKeys)
 		case mesos:
 			return InstallMesos(b)
 		case swarm:
@@ -313,9 +318,9 @@ func Install(targets []string, b backend.Backend, cb config.Backend, checkKeys f
 	return nil
 }
 
-func installDefaultServices(b backend.Backend, stateless bool, wg *sync.WaitGroup, out, err io.Writer) {
+func installDefaultServices(b backend.Backend, wg *sync.WaitGroup, out, err io.Writer) {
 
-	if !stateless {
+	if !Stateless {
 		fmt.Fprintln(out, "Storage subsystem...")
 		b.Create([]string{"store-daemon", "store-monitor", "store-metadata", "store-volume", "store-gateway@1"}, wg, out, err)
 		wg.Wait()
@@ -326,7 +331,7 @@ func installDefaultServices(b backend.Backend, stateless bool, wg *sync.WaitGrou
 	wg.Wait()
 
 	fmt.Fprintln(out, "Control plane...")
-	if stateless {
+	if Stateless {
 		b.Create([]string{"registry@1", "controller", "builder"}, wg, out, err)
 	} else {
 		b.Create([]string{"database", "registry@1", "controller", "builder"}, wg, out, err)
@@ -357,9 +362,10 @@ func Uninstall(targets []string, b backend.Backend) error {
 	if len(targets) == 1 {
 		switch targets[0] {
 		case PlatformCommand:
-			return UninstallPlatform(b, false)
+			return UninstallPlatform(b)
 		case StatelessPlatformCommand:
-			return UninstallPlatform(b, true)
+			Stateless = true
+			return UninstallPlatform(b)
 		case mesos:
 			return UninstallMesos(b)
 		case swarm:
@@ -378,7 +384,7 @@ func Uninstall(targets []string, b backend.Backend) error {
 	return nil
 }
 
-func uninstallAllServices(b backend.Backend, stateless bool, wg *sync.WaitGroup, out, err io.Writer) error {
+func uninstallAllServices(b backend.Backend, wg *sync.WaitGroup, out, err io.Writer) error {
 
 	fmt.Fprintln(out, "Router mesh...")
 	b.Destroy([]string{"router@*"}, wg, out, err)
@@ -389,7 +395,7 @@ func uninstallAllServices(b backend.Backend, stateless bool, wg *sync.WaitGroup,
 	wg.Wait()
 
 	fmt.Fprintln(out, "Control plane...")
-	if stateless {
+	if Stateless {
 		b.Destroy([]string{"controller", "builder", "registry@*"}, wg, out, err)
 	} else {
 		b.Destroy([]string{"controller", "builder", "database", "registry@*"}, wg, out, err)
@@ -397,14 +403,14 @@ func uninstallAllServices(b backend.Backend, stateless bool, wg *sync.WaitGroup,
 	wg.Wait()
 
 	fmt.Fprintln(out, "Logging subsystem...")
-	if stateless {
+	if Stateless {
 		b.Destroy([]string{"logspout"}, wg, out, err)
 	} else {
 		b.Destroy([]string{"logger", "logspout"}, wg, out, err)
 	}
 	wg.Wait()
 
-	if !stateless {
+	if !Stateless {
 		fmt.Fprintln(out, "Storage subsystem...")
 		b.Destroy([]string{"store-volume", "store-gateway@*"}, wg, out, err)
 		wg.Wait()
