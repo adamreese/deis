@@ -15,10 +15,17 @@ import (
 func UpgradePrep(b backend.Backend) error {
 	var wg sync.WaitGroup
 
-	b.Stop([]string{"database", "registry@*", "controller", "builder", "logger", "logspout"}, &wg, Stdout, Stderr)
+	b.Stop([]string{"database", "registry@*", "controller", "logger", "logspout"}, &wg, Stdout, Stderr)
 	wg.Wait()
-	b.Destroy([]string{"database", "registry@*", "controller", "builder", "logger", "logspout"}, &wg, Stdout, Stderr)
+	b.Destroy([]string{"database", "registry@*", "controller", "logger", "logspout"}, &wg, Stdout, Stderr)
 	wg.Wait()
+
+	if !Builderless {
+		b.Stop([]string{"builder"}, &wg, Stdout, Stderr)
+		wg.Wait()
+		b.Destroy([]string{"builder"}, &wg, Stdout, Stderr)
+		wg.Wait()
+	}
 
 	if !Stateless {
 		b.Stop([]string{"store-volume", "store-gateway@*"}, &wg, Stdout, Stderr)
@@ -125,11 +132,16 @@ func installUpgradeServices(b backend.Backend, wg *sync.WaitGroup, out, err io.W
 	wg.Wait()
 
 	fmt.Fprintln(out, "Control plane...")
-	if Stateless {
-		b.Create([]string{"registry@1", "controller", "builder"}, wg, out, err)
-	} else {
-		b.Create([]string{"database", "registry@1", "controller", "builder"}, wg, out, err)
+	controlPlane := []string{"registry@*", "controller"}
+
+	if !Stateless {
+		controlPlane = append(controlPlane, "database")
 	}
+
+	if !Builderless {
+		controlPlane = append(controlPlane, "builder")
+	}
+	b.Create(controlPlane, wg, out, err)
 	wg.Wait()
 
 	fmt.Fprintln(out, "Data plane...")
@@ -169,25 +181,21 @@ func startUpgradeServices(b backend.Backend, wg *sync.WaitGroup, out, err io.Wri
 	// Start these in parallel. This section can probably be removed now.
 	var bgwg sync.WaitGroup
 	var trash bytes.Buffer
-	batch := []string{
-		"database", "registry@*", "controller", "builder",
-		"publisher",
+	batch := []string{"registry@*", "controller", "publisher", "router@*"}
+	if !Stateless {
+		batch = append(batch, "database")
 	}
-	if Stateless {
-		batch = []string{"registry@*", "controller", "builder", "publisher", "router@*"}
+	if !Builderless {
+		batch = append(batch, "builder")
 	}
-	b.Start(batch, &bgwg, &trash, &trash)
-
 	fmt.Fprintln(Stdout, "Control plane...")
-	batch = []string{"database", "registry@*", "controller"}
-	if Stateless {
-		batch = []string{"registry@*", "controller"}
-	}
-	b.Start(batch, wg, out, err)
+	b.Start(batch, &bgwg, &trash, &trash)
 	wg.Wait()
 
-	b.Start([]string{"builder"}, wg, out, err)
-	wg.Wait()
+	if !Builderless {
+		b.Start([]string{"builder"}, wg, out, err)
+		wg.Wait()
+	}
 
 	fmt.Fprintln(out, "Data plane...")
 	b.Start([]string{"publisher"}, wg, out, err)

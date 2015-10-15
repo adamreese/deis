@@ -233,8 +233,8 @@ func TestStart(t *testing.T) {
 func TestStartPlatform(t *testing.T) {
 	b := backendStub{}
 	expected := []string{"store-monitor", "store-daemon", "store-metadata", "store-gateway@*",
-		"store-volume", "logger", "logspout", "database", "registry@*", "controller",
-		"builder", "publisher", "router@*", "database", "registry@*", "controller",
+		"store-volume", "logger", "logspout", "registry@*", "controller", "publisher",
+		"router@*", "database", "builder", "database", "registry@*", "controller",
 		"builder", "publisher", "router@*"}
 
 	Start([]string{"platform"}, &b)
@@ -247,11 +247,27 @@ func TestStartPlatform(t *testing.T) {
 func TestStartStatelessPlatform(t *testing.T) {
 	b := backendStub{}
 	expected := []string{"logger", "logspout", "registry@*", "controller",
-		"builder", "publisher", "router@*", "registry@*", "controller",
+		"publisher", "router@*", "builder", "registry@*", "controller",
 		"builder", "publisher", "router@*"}
 
 	Start([]string{"stateless-platform"}, &b)
 	Stateless = false
+
+	if !reflect.DeepEqual(b.startedUnits, expected) {
+		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.startedUnits))
+	}
+}
+
+func TestStartBuilderlessPlatform(t *testing.T) {
+	b := backendStub{}
+	expected := []string{"store-monitor", "store-daemon", "store-metadata", "store-gateway@*",
+		"store-volume", "logger", "logspout", "registry@*", "controller", "publisher",
+		"router@*", "database", "database", "registry@*", "controller",
+		"publisher", "router@*"}
+
+	Builderless = true
+	Start([]string{"platform"}, &b)
+	Builderless = false
 
 	if !reflect.DeepEqual(b.startedUnits, expected) {
 		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.startedUnits))
@@ -282,8 +298,9 @@ func TestRollingRestart(t *testing.T) {
 
 func TestUpgradePrep(t *testing.T) {
 	b := backendStub{}
-	expected := []string{"database", "registry@*", "controller", "builder", "logger", "logspout", "store-volume",
-		"store-gateway@*", "store-metadata", "store-daemon", "store-monitor"}
+	expected := []string{"database", "registry@*", "controller", "logger", "logspout",
+		"builder", "store-volume", "store-gateway@*", "store-metadata", "store-daemon",
+		"store-monitor"}
 
 	UpgradePrep(&b)
 
@@ -294,11 +311,25 @@ func TestUpgradePrep(t *testing.T) {
 
 func TestStatelessUpgradePrep(t *testing.T) {
 	b := backendStub{}
-	expected := []string{"database", "registry@*", "controller", "builder", "logger", "logspout"}
+	expected := []string{"database", "registry@*", "controller", "logger", "logspout", "builder"}
 
 	Stateless = true
 	UpgradePrep(&b)
 	Stateless = false
+
+	if !reflect.DeepEqual(b.stoppedUnits, expected) {
+		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.stoppedUnits))
+	}
+}
+
+func TestBuilderlessUpgradePrep(t *testing.T) {
+	b := backendStub{}
+	expected := []string{"database", "registry@*", "controller", "logger", "logspout", "store-volume",
+		"store-gateway@*", "store-metadata", "store-daemon", "store-monitor"}
+
+	Builderless = true
+	UpgradePrep(&b)
+	Builderless = false
 
 	if !reflect.DeepEqual(b.stoppedUnits, expected) {
 		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.stoppedUnits))
@@ -312,9 +343,8 @@ func TestUpgradeTakeover(t *testing.T) {
 	b := backendStub{}
 	expectedRestarted := []string{"router"}
 	expectedStarted := []string{"publisher", "store-monitor", "store-daemon", "store-metadata",
-		"store-gateway@*", "store-volume", "logger", "logspout", "database", "registry@*",
-		"controller", "builder", "publisher", "database", "registry@*",
-		"controller", "builder", "publisher"}
+		"store-gateway@*", "store-volume", "logger", "logspout", "registry@*", "controller",
+		"publisher", "router@*", "database", "builder", "builder", "publisher"}
 
 	if err := doUpgradeTakeOver(&b, testMock); err != nil {
 		t.Error(fmt.Errorf("Takeover failed: %v", err))
@@ -334,15 +364,38 @@ func TestStatelessUpgradeTakeover(t *testing.T) {
 
 	b := backendStub{}
 	expectedRestarted := []string{"router"}
-	expectedStarted := []string{"publisher", "logspout", "registry@*",
-		"controller", "builder", "publisher", "router@*", "registry@*",
-		"controller", "builder", "publisher"}
+	expectedStarted := []string{"publisher", "logspout", "registry@*", "controller",
+		"publisher", "router@*", "builder", "builder", "publisher"}
 
 	Stateless = true
 	if err := doUpgradeTakeOver(&b, testMock); err != nil {
 		t.Error(fmt.Errorf("Takeover failed: %v", err))
 	}
 	Stateless = false
+
+	if !reflect.DeepEqual(b.restartedUnits, expectedRestarted) {
+		t.Error(fmt.Errorf("Expected %v, Got %v", expectedRestarted, b.restartedUnits))
+	}
+	if !reflect.DeepEqual(b.startedUnits, expectedStarted) {
+		t.Error(fmt.Errorf("Expected %v, Got %v", expectedStarted, b.startedUnits))
+	}
+}
+
+func TestBuilderlessUpgradeTakeover(t *testing.T) {
+	testMock := mock.ConfigBackend{Expected: []*model.ConfigNode{{Key: "/deis/services/app1", Value: "foo", TTL: 10},
+		{Key: "/deis/services/app2", Value: "8000", TTL: 10}}}
+
+	b := backendStub{}
+	expectedRestarted := []string{"router"}
+	expectedStarted := []string{"publisher", "store-monitor", "store-daemon", "store-metadata",
+		"store-gateway@*", "store-volume", "logger", "logspout", "registry@*", "controller",
+		"publisher", "router@*", "database", "publisher"}
+
+	Builderless = true
+	if err := doUpgradeTakeOver(&b, testMock); err != nil {
+		t.Error(fmt.Errorf("Takeover failed: %v", err))
+	}
+	Builderless = false
 
 	if !reflect.DeepEqual(b.restartedUnits, expectedRestarted) {
 		t.Error(fmt.Errorf("Expected %v, Got %v", expectedRestarted, b.restartedUnits))
@@ -364,9 +417,9 @@ func TestStop(t *testing.T) {
 
 func TestStopPlatform(t *testing.T) {
 	b := backendStub{}
-	expected := []string{"router@*", "publisher", "controller", "builder", "database",
-		"registry@*", "logger", "logspout", "store-volume", "store-gateway@*",
-		"store-metadata", "store-daemon", "store-monitor"}
+	expected := []string{"router@*", "publisher", "registry@*", "controller",
+		"database", "builder", "logger", "logspout", "store-volume",
+		"store-gateway@*", "store-metadata", "store-daemon", "store-monitor"}
 	Stop([]string{"platform"}, &b)
 
 	if !reflect.DeepEqual(b.stoppedUnits, expected) {
@@ -376,10 +429,24 @@ func TestStopPlatform(t *testing.T) {
 
 func TestStopStatelessPlatform(t *testing.T) {
 	b := backendStub{}
-	expected := []string{"router@*", "publisher", "controller", "builder",
-		"registry@*", "logspout"}
+	expected := []string{"router@*", "publisher", "registry@*",
+		"controller", "builder", "logspout"}
 	Stop([]string{"stateless-platform"}, &b)
 	Stateless = false
+
+	if !reflect.DeepEqual(b.stoppedUnits, expected) {
+		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.stoppedUnits))
+	}
+}
+
+func TestStopBuilderlessPlatform(t *testing.T) {
+	b := backendStub{}
+	expected := []string{"router@*", "publisher", "registry@*", "controller",
+		"database", "logger", "logspout", "store-volume",
+		"store-gateway@*", "store-metadata", "store-daemon", "store-monitor"}
+	Builderless = true
+	Stop([]string{"platform"}, &b)
+	Builderless = false
 
 	if !reflect.DeepEqual(b.stoppedUnits, expected) {
 		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.stoppedUnits))
@@ -492,8 +559,8 @@ func TestInstallPlatform(t *testing.T) {
 	cb := mock.ConfigBackend{}
 
 	expected := []string{"store-daemon", "store-monitor", "store-metadata", "store-volume",
-		"store-gateway@1", "logger", "logspout", "database", "registry@1",
-		"controller", "builder", "publisher", "router@1", "router@2", "router@3"}
+		"store-gateway@1", "logger", "logspout", "registry@1", "controller", "database",
+		"builder", "publisher", "router@1", "router@2", "router@3"}
 
 	Install([]string{"platform"}, &b, &cb, fakeCheckKeys)
 
@@ -506,9 +573,10 @@ func TestInstallPlatformWithCustomRouterMeshSize(t *testing.T) {
 	b := backendStub{}
 	cb := mock.ConfigBackend{}
 
-	expected := []string{"store-daemon", "store-monitor", "store-metadata", "store-volume",
-		"store-gateway@1", "logger", "logspout", "database", "registry@1",
-		"controller", "builder", "publisher", "router@1", "router@2", "router@3", "router@4", "router@5"}
+	expected := []string{"store-daemon", "store-monitor", "store-metadata",
+		"store-volume", "store-gateway@1", "logger", "logspout", "registry@1",
+		"controller", "database", "builder", "publisher", "router@1", "router@2",
+		"router@3", "router@4", "router@5"}
 	RouterMeshSize = 5
 
 	Install([]string{"platform"}, &b, &cb, fakeCheckKeys)
@@ -528,6 +596,23 @@ func TestInstallStatelessPlatform(t *testing.T) {
 
 	Install([]string{"stateless-platform"}, &b, &cb, fakeCheckKeys)
 	Stateless = false
+
+	if !reflect.DeepEqual(b.installedUnits, expected) {
+		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.installedUnits))
+	}
+}
+
+func TestInstallBuilderlessPlatform(t *testing.T) {
+	b := backendStub{}
+	cb := mock.ConfigBackend{}
+
+	expected := []string{"store-daemon", "store-monitor", "store-metadata", "store-volume",
+		"store-gateway@1", "logger", "logspout", "registry@1", "controller", "database",
+		"publisher", "router@1", "router@2", "router@3"}
+
+	Builderless = true
+	Install([]string{"platform"}, &b, &cb, fakeCheckKeys)
+	Builderless = false
 
 	if !reflect.DeepEqual(b.installedUnits, expected) {
 		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.installedUnits))
@@ -560,8 +645,8 @@ func TestUninstall(t *testing.T) {
 
 func TestUninstallPlatform(t *testing.T) {
 	b := backendStub{}
-	expected := []string{"router@*", "publisher", "controller", "builder", "database",
-		"registry@*", "logger", "logspout", "store-volume", "store-gateway@*",
+	expected := []string{"router@*", "publisher", "registry@*", "controller",
+		"database", "builder", "logger", "logspout", "store-volume", "store-gateway@*",
 		"store-metadata", "store-daemon", "store-monitor"}
 
 	Uninstall([]string{"platform"}, &b)
@@ -573,11 +658,27 @@ func TestUninstallPlatform(t *testing.T) {
 
 func TestUninstallStatelessPlatform(t *testing.T) {
 	b := backendStub{}
-	expected := []string{"router@*", "publisher", "controller", "builder",
-		"registry@*", "logspout"}
+	expected := []string{"router@*", "publisher", "registry@*", "controller",
+		"builder", "logspout"}
 
 	Uninstall([]string{"stateless-platform"}, &b)
 	Stateless = false
+
+	if !reflect.DeepEqual(b.uninstalledUnits, expected) {
+		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.uninstalledUnits))
+	}
+}
+
+func TestUninstallBuilderlessPlatform(t *testing.T) {
+	b := backendStub{}
+
+	expected := []string{"router@*", "publisher", "registry@*", "controller",
+		"database", "logger", "logspout", "store-volume", "store-gateway@*",
+		"store-metadata", "store-daemon", "store-monitor"}
+
+	Builderless = true
+	Uninstall([]string{"platform"}, &b)
+	Builderless = false
 
 	if !reflect.DeepEqual(b.uninstalledUnits, expected) {
 		t.Error(fmt.Errorf("Expected %v, Got %v", expected, b.uninstalledUnits))

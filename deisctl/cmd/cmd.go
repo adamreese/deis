@@ -55,6 +55,7 @@ var Stderr io.Writer = os.Stderr
 var RouterMeshSize = DefaultRouterMeshSize
 
 var Stateless = false
+var Builderless = false
 
 // Scale grows or shrinks the number of running components.
 // Currently "router", "registry" and "store-gateway" are the only types that can be scaled.
@@ -158,12 +159,12 @@ func startDefaultServices(b backend.Backend, wg *sync.WaitGroup, out, err io.Wri
 	// Start these in parallel. This section can probably be removed now.
 	var bgwg sync.WaitGroup
 	var trash bytes.Buffer
-	batch := []string{
-		"database", "registry@*", "controller", "builder",
-		"publisher", "router@*",
+	batch := []string{"registry@*", "controller", "publisher", "router@*"}
+	if !Stateless {
+		batch = append(batch, "database")
 	}
-	if Stateless {
-		batch = []string{"registry@*", "controller", "builder", "publisher", "router@*"}
+	if !Builderless {
+		batch = append(batch, "builder")
 	}
 	b.Start(batch, &bgwg, &trash, &trash)
 	// End background stuff.
@@ -176,8 +177,10 @@ func startDefaultServices(b backend.Backend, wg *sync.WaitGroup, out, err io.Wri
 	b.Start(batch, wg, out, err)
 	wg.Wait()
 
-	b.Start([]string{"builder"}, wg, out, err)
-	wg.Wait()
+	if !Builderless {
+		b.Start([]string{"builder"}, wg, out, err)
+		wg.Wait()
+	}
 
 	fmt.Fprintln(out, "Data plane...")
 	b.Start([]string{"publisher"}, wg, out, err)
@@ -227,11 +230,17 @@ func stopDefaultServices(b backend.Backend, wg *sync.WaitGroup, out, err io.Writ
 	wg.Wait()
 
 	fmt.Fprintln(out, "Control plane...")
-	if Stateless {
-		b.Stop([]string{"controller", "builder", "registry@*"}, wg, out, err)
-	} else {
-		b.Stop([]string{"controller", "builder", "database", "registry@*"}, wg, out, err)
+	controlPlane := []string{"registry@*", "controller"}
+
+	if !Stateless {
+		controlPlane = append(controlPlane, "database")
 	}
+
+	if !Builderless {
+		controlPlane = append(controlPlane, "builder")
+	}
+
+	b.Stop(controlPlane, wg, out, err)
 	wg.Wait()
 
 	fmt.Fprintln(out, "Logging subsystem...")
@@ -331,11 +340,17 @@ func installDefaultServices(b backend.Backend, wg *sync.WaitGroup, out, err io.W
 	wg.Wait()
 
 	fmt.Fprintln(out, "Control plane...")
-	if Stateless {
-		b.Create([]string{"registry@1", "controller", "builder"}, wg, out, err)
-	} else {
-		b.Create([]string{"database", "registry@1", "controller", "builder"}, wg, out, err)
+	controlPlane := []string{"registry@1", "controller"}
+
+	if !Stateless {
+		controlPlane = append(controlPlane, "database")
 	}
+
+	if !Builderless {
+		controlPlane = append(controlPlane, "builder")
+	}
+
+	b.Create(controlPlane, wg, out, err)
 	wg.Wait()
 
 	fmt.Fprintln(out, "Data plane...")
@@ -395,11 +410,17 @@ func uninstallAllServices(b backend.Backend, wg *sync.WaitGroup, out, err io.Wri
 	wg.Wait()
 
 	fmt.Fprintln(out, "Control plane...")
-	if Stateless {
-		b.Destroy([]string{"controller", "builder", "registry@*"}, wg, out, err)
-	} else {
-		b.Destroy([]string{"controller", "builder", "database", "registry@*"}, wg, out, err)
+	controlPlane := []string{"registry@*", "controller"}
+
+	if !Stateless {
+		controlPlane = append(controlPlane, "database")
 	}
+
+	if !Builderless {
+		controlPlane = append(controlPlane, "builder")
+	}
+
+	b.Destroy(controlPlane, wg, out, err)
 	wg.Wait()
 
 	fmt.Fprintln(out, "Logging subsystem...")

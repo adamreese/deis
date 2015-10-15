@@ -75,10 +75,11 @@ func (c *Client) UpgradePrep(argv []string) error {
 	usage := `Prepare platform for graceful upgrade.
 
 Usage:
-  deisctl upgrade-prep [--stateless]
+  deisctl upgrade-prep [options]
 
 Options:
-  --stateless  Use when the target platform is stateless
+  --stateless    Use when the target platform is stateless
+  --builderless  Use when the target platform is builderless
 `
 	args, err := docopt.Parse(usage, argv, true, "", false)
 	if err != nil {
@@ -86,6 +87,7 @@ Options:
 	}
 
 	cmd.Stateless, _ = args["--stateless"].(bool)
+	cmd.Builderless, _ = args["--builderless"].(bool)
 
 	return cmd.UpgradePrep(c.Backend)
 }
@@ -95,10 +97,11 @@ func (c *Client) UpgradeTakeover(argv []string) error {
 	usage := `Complete the upgrade of a prepped cluster.
 
 Usage:
-  deisctl upgrade-takeover [--stateless]
+  deisctl upgrade-takeover [options]
 
 Options:
-  --stateless  Use when the target platform is stateless
+  --stateless    Use when the target platform is stateless
+  --builderless  Use when the target platform is builderless
 `
 	args, err := docopt.Parse(usage, argv, true, "", false)
 	if err != nil {
@@ -106,6 +109,7 @@ Options:
 	}
 
 	cmd.Stateless, _ = args["--stateless"].(bool)
+	cmd.Builderless, _ = args["--builderless"].(bool)
 
 	return cmd.UpgradeTakeover(c.Backend, c.configBackend)
 }
@@ -194,6 +198,7 @@ Usage:
 Options:
   --router-mesh-size=<num>  Number of routers to be loaded when installing the platform [default: %d].
   --stateless=false         Install the platform in stateless mode [default: false].
+  --builderless             Use when the target platform is builderless
 `, cmd.DefaultRouterMeshSize)
 	// parse command-line arguments
 	args, err := docopt.Parse(usage, argv, true, "", false)
@@ -210,6 +215,7 @@ Options:
 	cmd.RouterMeshSize = uint8(parsedValue)
 
 	cmd.Stateless, _ = args["--stateless"].(bool)
+	cmd.Builderless, _ = args["--builderless"].(bool)
 
 	return cmd.Install(args["<target>"].([]string), c.Backend, c.configBackend, cmd.CheckRequiredKeys)
 }
